@@ -5,34 +5,13 @@ import xyz.sl.processNotify.NotifyTo;
 import xyz.sl.processNotify.WaitFor;
 
 import java.io.*;
-import java.nio.channels.FileChannel;
-import java.nio.channels.FileLock;
-import java.nio.channels.OverlappingFileLockException;
-import sun.nio.ch.FileChannelImpl;
 
 public class ProcessWaitAndNotify implements NotifyTo, WaitFor {
 
     LockID fileName;
-    FileChannel fileChannel;
-    FileLock fileLock;
-    FileDescriptor fd;
 
-
-
-    public ProcessWaitAndNotify(LockID lock) throws IOException {
+    public ProcessWaitAndNotify(LockID lock) {
         this.fileName = lock;
-        if (!new File((String) fileName.getLockID()).exists()){
-            if (!new File((String) fileName.getLockID()).createNewFile()){
-                throw new IOException("error to create file " + fileName.getLockID());
-            }
-        }
-
-        // 准备创建文件锁
-        FileOutputStream fos = new FileOutputStream((String) fileName.getLockID());
-        fd = fos.getFD();
-
-        fileChannel = fos.getChannel();
-        fileLock = fileChannel.lock();
     }
 
     /**发送通知的过程实际就是创建一个文件
@@ -46,7 +25,21 @@ public class ProcessWaitAndNotify implements NotifyTo, WaitFor {
     @Override
     public void notify2() {
         try {
+            if (!new File((String) fileName.getLockID()).exists()){
+                if (!new File((String) fileName.getLockID()).createNewFile()){
+                    throw new IOException("error to create file " + fileName.getLockID());
+                }
+            }
+
+            /* wait4 中 判断file.exists和lock.delete之间有空隙
+               这个空隙中有可能执行两次notify2
+               因此通知的过程需要有意打断，让wait4执行完
+             */
+            Thread.sleep(10);
+
 //            fileLock.release();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -63,12 +56,14 @@ public class ProcessWaitAndNotify implements NotifyTo, WaitFor {
      *  return
      */
     @Override
-    public void wait4() {
-        try {
-//            fileLock = fileChannel.lock();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+    public void wait4() throws InterruptedException{
+
+        File lock = new File((String) fileName.getLockID());
+        while (!lock.exists()){
+            Thread.sleep(10);
         }
+        lock.delete();
+//        fileLock = fileChannel.lock();
     }
 
 
