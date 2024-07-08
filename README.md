@@ -1,3 +1,6 @@
+构建工具 Gradle 8.1.0
+jdk版本 17
+
 ## 线程级别通知等待示例 ： ThreadLevel类
 
 ## 进程级别通知等待示例 ： Alice.java、Bob.java、Crick.java
